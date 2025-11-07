@@ -1,12 +1,4 @@
-/**
- * React Native Calculator (hooks + modern RN patterns)
- * - Clean, responsive UI (adapts with useWindowDimensions)
- * - Basic ops: + - × ÷
- * - Advanced ops: % (postfix), √ (unary), ^ (power)
- * - Live expression + calculated result
- * - No eval(): shunting-yard parser + RPN evaluator
- * - Functional Components + Hooks only
- */
+
 
 import * as React from 'react';
 import {
@@ -19,24 +11,18 @@ import {
 } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 
-/** ---------- Helpers & Types ---------- */
+
 
 type Assoc = 'L' | 'R';
 
 type OpInfo = {
-  prec: number;     // precedence
-  assoc: Assoc;     // associativity
-  unary?: boolean;  // unary operator (e.g., √)
-  func?: (a: number, b?: number) => number; // implementation
+  prec: number;  
+  assoc: Assoc;     
+  unary?: boolean;  
+  func?: (a: number, b?: number) => number; 
 };
 
-/**
- * Operator table:
- * - '^' right-associative power
- * - '√' unary square root
- * - '%' postfix percentage (handled as unary that divides by 100)
- * - '×', '÷', '+', '-'
- */
+
 const OPS: Record<string, OpInfo> = {
   '^': { prec: 4, assoc: 'R', func: (a, b) => Math.pow(a, b ?? 1) },
   '√': { prec: 5, assoc: 'R', unary: true, func: a => Math.sqrt(a) },
@@ -54,15 +40,7 @@ const DIGITS = ['7','8','9','4','5','6','1','2','3','0','.'] as const;
 const BASIC = ['+', '-', '×', '÷'] as const;
 const ADV   = ['^', '√', '%', '(', ')'] as const;
 
-/** ---------- Tokenization ---------- */
-/**
- * Tokenizes an input string into numbers, operators, and parentheses.
- * Supports:
- *  - numbers (integers/decimals)
- *  - ops: + - × ÷ ^ % √
- *  - parentheses ( and )
- *  - implicit unary minus handled later by pre-processing
- */
+
 function tokenize(expr: string): string[] {
   const tokens: string[] = [];
   let i = 0;
@@ -75,7 +53,7 @@ function tokenize(expr: string): string[] {
       i++;
       continue;
     }
-    // number: digits + optional single decimal
+    
     if (/\d|\./.test(ch)) {
       let j = i + 1;
       while (j < expr.length && /[\d.]/.test(expr[j])) j++;
@@ -83,19 +61,14 @@ function tokenize(expr: string): string[] {
       i = j;
       continue;
     }
-    // unknown char -> make it invalid token
+    
     tokens.push(ch);
     i++;
   }
   return tokens;
 }
 
-/** ---------- Preprocess for unary minus ---------- */
-/**
- * Convert unary '-' into '0 - ...' to simplify parsing.
- * E.g., "-3+2" -> "0","-","3","+","2"
- * Also handles "(-3)" after '(' or other operators.
- */
+
 function normalizeUnaryMinus(tokens: string[]): string[] {
   const out: string[] = [];
   for (let i = 0; i < tokens.length; i++) {
@@ -104,7 +77,7 @@ function normalizeUnaryMinus(tokens: string[]): string[] {
       t === '-' &&
       (i === 0 || ['(', '+', '-', '×', '÷', '^', '√'].includes(tokens[i - 1]))
     ) {
-      out.push('0'); // inject zero for unary minus
+      out.push('0'); 
       out.push('-');
     } else {
       out.push(t);
@@ -113,7 +86,6 @@ function normalizeUnaryMinus(tokens: string[]): string[] {
   return out;
 }
 
-/** ---------- Shunting-yard (to RPN) ---------- */
 function toRPN(tokens: string[]): string[] {
   const out: string[] = [];
   const stack: string[] = [];
@@ -121,19 +93,18 @@ function toRPN(tokens: string[]): string[] {
   for (let i = 0; i < tokens.length; i++) {
     const t = tokens[i];
 
-    // number
+    
     if (!isNaN(Number(t))) {
       out.push(t);
       continue;
     }
 
-    // functions/unary prefix (√) or operators
     if (t in OPS) {
       const thisOp = OPS[t];
 
-      // Postfix '%' should be applied immediately to previous value:
+     
       if (t === '%') {
-        // treat as operator: pop/compare with stack precedence as unary
+    
         while (stack.length) {
           const top = stack[stack.length - 1];
           if (!(top in OPS)) break;
@@ -149,7 +120,7 @@ function toRPN(tokens: string[]): string[] {
         continue;
       }
 
-      // regular operator
+     
       while (stack.length) {
         const top = stack[stack.length - 1];
         if (!(top in OPS)) break;
@@ -174,15 +145,13 @@ function toRPN(tokens: string[]): string[] {
         out.push(stack.pop()!);
       }
       if (stack.length && stack[stack.length - 1] === '(') stack.pop(); // discard '('
-      else return ['NaN']; // mismatched parenthesis -> error
+      else return ['NaN']; 
       continue;
     }
 
-    // Unknown token => error
     return ['NaN'];
   }
 
-  // drain stack
   while (stack.length) {
     const top = stack.pop()!;
     if (top === '(' || top === ')') return ['NaN'];
@@ -191,7 +160,7 @@ function toRPN(tokens: string[]): string[] {
   return out;
 }
 
-/** ---------- RPN evaluation ---------- */
+
 function evalRPN(rpn: string[]): number {
   const st: number[] = [];
   for (const t of rpn) {
@@ -208,7 +177,7 @@ function evalRPN(rpn: string[]): number {
       st.push(v);
       continue;
     }
-    // binary ops
+  
     if (t in OPS) {
       const b = st.pop();
       const a = st.pop();
@@ -223,14 +192,14 @@ function evalRPN(rpn: string[]): number {
   return st.length === 1 ? st[0] : NaN;
 }
 
-/** Format number nicely, trimming trailing zeros. */
+
 function fmt(n: number): string {
   if (!isFinite(n)) return 'Error';
   const s = n.toFixed(10);                // avoid float artifacts
   return s.replace(/\.?0+$/,'');          // strip trailing zeros and dot
 }
 
-/** Try to evaluate an expression string safely; returns "" if incomplete. */
+
 function tryEval(expr: string): string {
   if (!expr) return '';
   const tokens = normalizeUnaryMinus(tokenize(expr));
@@ -241,7 +210,7 @@ function tryEval(expr: string): string {
   return fmt(val);
 }
 
-/** ---------- UI: Button ---------- */
+
 function PadButton({
   label,
   onPress,
@@ -286,7 +255,7 @@ function PadButton({
   );
 }
 
-/** Simple color shade for pressed state */
+
 function shade(hex: string, intensity = 0.1) {
   if (!hex.startsWith('#')) return hex;
   const n = parseInt(hex.slice(1), 16);
@@ -296,22 +265,22 @@ function shade(hex: string, intensity = 0.1) {
   return `#${h.toString(16).padStart(6, '0')}`;
 }
 
-/** ---------- Main App ---------- */
+
 export default function App() {
-  // expression typed by the user (e.g., "12+3×(4-2)")
+
   const [expr, setExpr] = React.useState<string>('');
-  // computed result (live)
+  
   const [result, setResult] = React.useState<string>('');
-  // whether last action was equals (so next digit starts a new expr)
+  
   const [justEq, setJustEq] = React.useState<boolean>(false);
 
   const { width } = useWindowDimensions();
   const isTablet = width >= 768;
 
-  /** Recompute result whenever expression changes */
+  
   React.useEffect(() => {
     if (!expr) { setResult(''); return; }
-    // Only try evaluating if expression ends with a number or ')', '%' (likely "complete-ish")
+  
     const last = expr.slice(-1);
     if (/\d|\)|%/.test(last)) {
       setResult(tryEval(expr));
@@ -320,11 +289,11 @@ export default function App() {
     }
   }, [expr]);
 
-  /** Append token safely, resetting after '=' if needed */
+  
   const push = (t: string) => {
     setExpr(prev => {
       if (justEq) {
-        // If user starts with operator after '=', continue chaining
+      
         const start = BASIC.concat('^','%','×','÷' as any).includes(t)
           ? prev + t
           : t;
@@ -335,9 +304,9 @@ export default function App() {
     });
   };
 
-  /** Digit / dot */
+ 
   const onDigit = (d: string) => {
-    // prevent double dots in the current number segment
+    
     if (d === '.') {
       const seg = lastNumberSegment(expr);
       if (seg.includes('.')) return;
@@ -346,9 +315,9 @@ export default function App() {
     push(d);
   };
 
-  /** Operators */
+  
   const onOp = (op: string) => {
-    if (!expr && op !== '√' && op !== '(') return; // ignore starting with binary op
+    if (!expr && op !== '√' && op !== '(') return; 
     // Avoid duplicate binary operators (replace last if needed)
     if (BASIC.concat('^','×','÷' as any).includes(op)) {
       if (expr && BASIC.concat('^','×','÷' as any).includes(expr.slice(-1)))
@@ -356,7 +325,7 @@ export default function App() {
       else push(op);
       return;
     }
-    // √ can come before number or '('
+ 
     if (op === '√') {
       // If placed after a number/closing paren, insert implicit multiplication: "2√9" -> "2×√9"
       if (/\d|\)|%/.test(expr.slice(-1))) push('×');
@@ -534,7 +503,7 @@ function Grid({ columns, children }: { columns: number; children: React.ReactNod
   );
 }
 
-/** ---------- Small parsing utilities ---------- */
+
 
 /** Returns the last contiguous number segment indices [start, end) in expr, or null. */
 function lastNumberIndex(expr: string): [number, number] | null {
